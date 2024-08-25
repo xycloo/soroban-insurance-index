@@ -1189,6 +1189,7 @@ name = "soroban-insurance-index"
 version = "0.1.0"
 dependencies = [
  "serde",
+ "stellar-strkey",
  "zephyr-sdk",
 ]
 

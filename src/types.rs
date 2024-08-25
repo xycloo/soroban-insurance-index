@@ -8,24 +8,28 @@ use zephyr_sdk::{
 #[derive(Serialize, Deserialize, Clone)]
 pub struct SimulateDeposit {
     pub from: String,
-    pub sequence: i64,
-    pub amount: i64,
+    pub amount: i64
 }
 
 #[derive(Serialize, Deserialize, Clone)]
-pub struct SimulateVote {
+pub struct SimulateUpdateFeeRewards {
     pub from: String,
-    pub sequence: i64,
-    pub hash: String,
-    pub upvote: bool,
+    pub period: i32
 }
 
 #[derive(Serialize, Deserialize, Clone)]
 pub enum SimulationRequest {
-    Deposit(SimulateVote),
+    Deposit(SimulateDeposit),
+    // UpdateFeeRewards(SimulateUpdateFeeRewards)
+}
+
+/*
+pub enum SimulationRequest {
+    Deposit(SimulateDeposit),
     UpdateFeeRewards(SimulateVote),
     WithdrawMarured(Simulate),
     Withdraw(Simulate),
     Subscribe(Simulate),
     ClaimReward(Simulate),
 }
+*/
