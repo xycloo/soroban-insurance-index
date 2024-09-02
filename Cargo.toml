@@ -7,6 +7,7 @@ edition = "2021"
 zephyr-sdk = { version = "0.1.6" }
 serde = { version = "1", features = ["derive"] }
 stellar-strkey = "0.0.8"
+fixed-point-math = "0.0.2"
 
 [lib]
 crate-type = ["cdylib"]

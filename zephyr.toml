@@ -1,1 +1,8 @@
 name = "soroban-insurance-index"
+
+[[tables]]
+name = "pools"
+
+[[tables.columns]]
+name = "address"
+col_type = "BYTEA"
