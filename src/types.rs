@@ -1,9 +1,23 @@
 use serde::{Deserialize, Serialize};
 use zephyr_sdk::{
     prelude::*,
-    soroban_sdk::{self, contracttype, xdr::ScVal, Address},
+    soroban_sdk::{self, contracttype, Address},
     DatabaseDerive, EnvClient,
 };
+
+// request to call the API function get_user_data
+#[derive(Serialize, Deserialize)]
+pub struct UserRequest {
+    pub user: String,
+    pub period: i32,
+}
+
+#[derive(Clone, PartialEq)]
+#[contracttype]
+pub struct BalanceObject {
+    pub address: Address,
+    pub period: i32,
+}
 
 #[derive(DatabaseDerive, Clone, Serialize)]
 #[with_name("pools")]
@@ -14,6 +28,16 @@ pub struct PoolsTable {
 #[derive(Serialize)]
 pub struct Response {
     pub tx: String,
+}
+
+#[derive(Serialize)]
+pub struct UserData {
+    pub user: String,
+    pub address: String,
+    pub user_balance: i128,
+    pub user_principal: i128,
+    pub user_matured_fees: i128,
+    pub user_refund: i128,
 }
 
 #[derive(Serialize)]
@@ -32,6 +56,7 @@ pub struct PoolData {
     pub tot_liquidity: i128,
     pub tot_supply: i128,
     pub refund_global: i128,
+    pub period: i32,
 }
 
 #[derive(Clone, Copy)]
@@ -47,13 +72,6 @@ pub enum InstanceDataKey {
     Volatility,
     Admin,
     Multiplier,
-}
-
-#[derive(Clone)]
-#[contracttype]
-pub struct BalanceObject {
-    address: Address,
-    period: i32,
 }
 
 #[derive(Clone)]

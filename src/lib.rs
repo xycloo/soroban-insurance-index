@@ -1,5 +1,4 @@
 use maths::*;
-use serde::Serialize;
 use types::*;
 use zephyr_sdk::{
     prelude::*,
@@ -9,19 +8,21 @@ use zephyr_sdk::{
             self, LedgerEntryData, ScVal, TransactionEnvelope, TransactionExt,
             TransactionV1Envelope,
         },
-        Address, Bytes, BytesN, IntoVal, String as SString, Symbol,
+        Address, IntoVal, String as SString, Symbol,
     },
-    utils::address_to_alloc_string,
-    DatabaseDerive, EnvClient,
+    utils::{address_from_str, address_to_alloc_string},
+    EnvClient,
 };
 
 mod maths;
 mod types;
 
+/*
 const CONTRACT_ADDRESS: [u8; 32] = [
     49, 27, 135, 97, 127, 42, 250, 76, 254, 105, 64, 142, 243, 103, 117, 92, 63, 2, 173, 226, 148,
     9, 73, 17, 217, 128, 179, 107, 100, 175, 71, 9,
 ];
+*/
 
 #[no_mangle]
 pub extern "C" fn on_close() {
@@ -43,17 +44,118 @@ pub extern "C" fn on_close() {
 }
 
 // create a function to get the specific data about a certain user
+// - needs to match the key (like with ledger entries) where the entry we're looking for depends on the BalanceObjetct type that we
+//   imported.
+// - need to pass the address as variable (obtained from the fronted when wallet is connected), and provide as argument also the period
+//   (we pass it from the frontend so the user can choose the insurance period to see its entries in)
+#[no_mangle]
+pub extern "C" fn user_data() {
+    let env = EnvClient::empty();
+
+    let request: UserRequest = env.read_request_body();
+    let user = address_from_str(&env, &request.user);
+    let selected_period = request.period;
+
+    let pools = env.read::<PoolsTable>();
+    let addresses: Vec<String> = pools.iter().map(|pool| pool.address.clone()).collect();
+
+    let user_particular_data: Vec<UserData> = addresses
+        .iter()
+        .filter_map(|address| {
+            let entries = env
+                .read_contract_entries(stellar_strkey::Contract::from_string(address).unwrap().0)
+                .unwrap();
+
+            let mut user_balance: i128 = 0;
+            let mut user_principal: i128 = 0;
+            let mut user_matured_fees: i128 = 0;
+            let mut user_refund: i128 = 0;
+
+            for entry in entries.clone() {
+                let LedgerEntryData::ContractData(data) = entry.entry.data else {
+                    env.log()
+                        .debug(format!("not contract data {:?}", entry.entry.data), None);
+                    panic!()
+                };
+
+                if let Ok(entry_key) = env.try_from_scval::<PersistentDataKey>(&data.key) {
+                    let balance_object = BalanceObject {
+                        address: user.clone(),
+                        period: selected_period,
+                    };
+
+                    match entry_key {
+                        PersistentDataKey::Balance(bo) if bo == balance_object => {
+                            user_balance = env.from_scval(&data.val);
+                            env.log().debug(
+                                format!(
+                                    "balance for user {:?} for period {:?}: {:?}",
+                                    &request.user, selected_period, user_balance as i64
+                                ),
+                                None,
+                            );
+                        }
+                        PersistentDataKey::Principal(bo) if bo == balance_object => {
+                            user_principal = env.from_scval(&data.val);
+                            env.log().debug(
+                                format!(
+                                    "principal for user {:?} for period {:?}: {:?}",
+                                    &request.user, selected_period, user_principal as i64
+                                ),
+                                None,
+                            );
+                        }
+                        PersistentDataKey::MaturedFeesParticular(bo) if bo == balance_object => {
+                            user_matured_fees = env.from_scval(&data.val);
+                            env.log().debug(
+                                format!(
+                                    "matured fees for user {:?} for period {:?}: {:?}",
+                                    &request.user, selected_period, user_matured_fees as i64
+                                ),
+                                None,
+                            );
+                        }
+                        PersistentDataKey::RefundParticular(bo) if bo == balance_object => {
+                            user_refund = env.from_scval(&data.val);
+                            env.log().debug(
+                                format!(
+                                    "refund for user {:?} for period {:?}: {:?}",
+                                    &request.user, selected_period, user_refund as i64
+                                ),
+                                None,
+                            );
+                        }
+                        _ => (),
+                    }
+                }
+            }
+            Some(UserData {
+                user: request.user.clone(),
+                address: address.clone(),
+                user_balance,
+                user_principal,
+                user_matured_fees,
+                user_refund,
+            })
+        })
+        .collect();
+
+    env.conclude(&user_particular_data)
+}
+
+/*
 
 #[no_mangle]
 pub extern "C" fn get_pools() {
     let env = EnvClient::empty();
 
-    // soroban env to get the latest ledger
+    // soroban env to get the latest ledger and use soroban SDK functonality
     let soroban_env = env.soroban();
 
     let pools = env.read::<PoolsTable>();
     let addresses: Vec<String> = pools.iter().map(|pool| pool.address.clone()).collect();
 
+    // get pool data from the instance e entries
     let pool_data: Vec<PoolData> = addresses
         .iter()
         .filter_map(|address| {
@@ -181,6 +283,7 @@ pub extern "C" fn get_pools() {
             let mut tot_supply: i128 = 0;
             let mut refund_global: i128 = 0;
 
+            // for each ledger entry, sees if its key is one of the ones we're interested in and updates the value (tot_liquidity, ...)
             for entry in entries.clone() {
                 let LedgerEntryData::ContractData(data) = entry.entry.data else {
                     env.log()
@@ -239,12 +342,15 @@ pub extern "C" fn get_pools() {
                 tot_liquidity,
                 tot_supply,
                 refund_global,
+                period, // returns actual period
             })
         })
         .collect();
 
     env.conclude(&pool_data)
 }
+
+*/
 
 #[no_mangle]
 pub extern "C" fn simulate() {
